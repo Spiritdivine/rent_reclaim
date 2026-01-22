@@ -26,7 +26,6 @@ export async function analyzeAccounts({
   const accounts = (getTrackedAccounts() as TrackedAccount[]).filter(
     (acc) => !acc.is_closed,
   );
-  const currentSlot = await connection.getSlot("confirmed");
 
   for (const acc of accounts) {
     try {
@@ -39,20 +38,33 @@ export async function analyzeAccounts({
         continue;
       }
 
+      // Detect "activity" - for simplicity, we check if the lamports or owner changed
+      // In a real bot, we might fetch signatures for the account specifically.
       const isExecutable = info.executable;
       const ownerProgram = info.owner.toBase58();
       const dataSize = info.data.length;
       const lamports = info.lamports;
 
-      updateAccountActivity(acc.account_pubkey, currentSlot, {
-        owner_program: ownerProgram,
-        is_executable: isExecutable,
-        data_size: dataSize,
-        lamports,
-      });
+      let lastActivitySlot = acc.last_activity_slot;
+
+      // If balance changed since last scan, it's active
+      if (acc.lamports !== null && acc.lamports !== lamports) {
+        lastActivitySlot = await connection.getSlot("confirmed");
+      }
+
+      updateAccountActivity(
+        acc.account_pubkey,
+        lastActivitySlot || acc.creation_slot,
+        {
+          owner_program: ownerProgram,
+          is_executable: isExecutable,
+          data_size: dataSize,
+          lamports,
+        },
+      );
 
       logger.info(
-        `Analyzed ${acc.account_pubkey}: owner=${ownerProgram}, size=${dataSize}, lamports=${lamports}`,
+        `Analyzed ${acc.account_pubkey}: owner=${ownerProgram}, size=${dataSize}, lamports=${lamports}, activeSlot=${lastActivitySlot}`,
       );
     } catch (err) {
       logger.error(`Error analyzing account ${acc.account_pubkey}: ${err}`);

@@ -11,6 +11,7 @@ import {
 import { getConnection } from "../solana/connection";
 import { addSponsoredAccount } from "../db/accounts.repo";
 import { logger } from "../utils/logger";
+import { getLastSignature, saveLastSignature } from "../utils/checkpoint";
 
 /**
  * Scan recent transactions for sponsored account creations.
@@ -29,13 +30,21 @@ export async function scanSponsoredAccounts({
 }) {
   const connection = getConnection(network);
   const treasuryKey = new PublicKey(koraTreasuryPubkey);
+  const lastSig = getLastSignature();
 
   // Fetch recent confirmed transactions for the treasury
   const signatures = await connection.getSignaturesForAddress(treasuryKey, {
     limit,
+    until: lastSig || undefined,
   });
 
-  for (const sigInfo of signatures) {
+  if (signatures.length === 0) {
+    logger.info("No new transactions to scan.");
+    return;
+  }
+
+  // Process in reverse to maintain order and update last signature correctly
+  for (const sigInfo of [...signatures].reverse()) {
     try {
       const tx = await connection.getParsedTransaction(sigInfo.signature, {
         commitment: "confirmed",
@@ -73,6 +82,9 @@ export async function scanSponsoredAccounts({
           );
         }
       }
+
+      // Update checkpoint after successful scan of a tx
+      saveLastSignature(sigInfo.signature);
     } catch (err) {
       logger.error(`Error scanning tx ${sigInfo.signature}: ${err}`);
     }

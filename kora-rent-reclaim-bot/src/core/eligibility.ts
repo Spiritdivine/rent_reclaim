@@ -28,6 +28,9 @@ export function checkEligibility(account: {
     account.currentSlot - account.lastActivitySlot < 10000
   )
     return { eligible: false, reason: "Recently active account" };
+  // ❌ Protected programs
+  if (account.protectedPrograms.includes(account.ownerProgram))
+    return { eligible: false, reason: "Protected program" };
   // ❌ Unknown programs without close support
   if (!account.knownClosable && !account.systemOwnedEmpty && !account.isClosed)
     return { eligible: false, reason: "Unknown program, no close support" };

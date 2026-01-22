@@ -1,10 +1,25 @@
-// Purpose: Alerting for important events (optional)
-// Solana-specific: Can notify on reclaim actions, errors, etc.
-// Safety: All alerts are explicit, no silent failures
+import axios from "axios";
+import { logger } from "../utils/logger";
 
 /**
- * Send alert (stub for extension)
+ * Send alert via Webhook (Discord/Telegram)
  */
-export function sendAlert(message: string) {
-  // ...existing code to send alert (e.g., email, webhook)...
+export async function sendAlert(message: string) {
+  const webhookUrl = process.env.KORA_ALERT_WEBHOOK_URL;
+
+  if (!webhookUrl) {
+    logger.info(`[ALERT-STUB] ${message}`);
+    return;
+  }
+
+  try {
+    // Basic support for Discord/Slack-style JSON webhooks
+    await axios.post(webhookUrl, {
+      content: message, // Discord
+      text: message, // Slack/Telegram potentially
+    });
+    logger.info(`[ALERT-SENT] Webhook notification delivered.`);
+  } catch (err) {
+    logger.error(`[ALERT-ERROR] Failed to send webhook: ${err}`);
+  }
 }

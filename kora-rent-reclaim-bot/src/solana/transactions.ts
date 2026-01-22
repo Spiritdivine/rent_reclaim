@@ -6,7 +6,10 @@ import {
   ParsedTransactionWithMeta,
   ParsedInstruction,
   SystemProgram,
+  PublicKey,
+  TransactionInstruction,
 } from "@solana/web3.js";
+import { createCloseAccountInstruction } from "@solana/spl-token";
 
 export function parseAccountCreation(tx: ParsedTransactionWithMeta): Array<{
   account_pubkey: string;
@@ -62,4 +65,38 @@ export function parseCloseInstruction(tx: ParsedTransactionWithMeta): Array<{
   }
 
   return closes;
+}
+
+/**
+ * Creates an instruction to reclaim rent from an account.
+ * For SPL Token accounts, uses closeAccount.
+ * For System accounts (0 data), uses transfer.
+ */
+export function createReclaimInstruction({
+  accountPubkey,
+  destinationPubkey,
+  authorityPubkey,
+  isToken = false,
+  lamports = 0,
+}: {
+  accountPubkey: string;
+  destinationPubkey: string;
+  authorityPubkey: string;
+  isToken?: boolean;
+  lamports?: number;
+}): TransactionInstruction {
+  if (isToken) {
+    return createCloseAccountInstruction(
+      new PublicKey(accountPubkey),
+      new PublicKey(destinationPubkey),
+      new PublicKey(authorityPubkey),
+    );
+  } else {
+    // For system accounts, we just transfer everything
+    return SystemProgram.transfer({
+      fromPubkey: new PublicKey(accountPubkey),
+      toPubkey: new PublicKey(destinationPubkey),
+      lamports,
+    });
+  }
 }

@@ -16,8 +16,19 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4",
-    "better-sqlite3": "^12.6.0"
+    "@types/body-parser": "^1.19.6",
+    "@types/bs58": "^4.0.4",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.0.10",
+    "axios": "^1.13.2",
+    "better-sqlite3": "^12.6.0",
+    "body-parser": "^2.2.2",
+    "bs58": "^6.0.0",
+    "express": "^5.2.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13"

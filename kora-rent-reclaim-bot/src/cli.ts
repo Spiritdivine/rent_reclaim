@@ -7,6 +7,9 @@ import { scanSponsoredAccounts } from "./core/scanner";
 import { analyzeAccounts } from "./core/analyzer";
 import { generateReport } from "./core/reporter";
 import { reclaimAllEligible } from "./core/reclaimer";
+import { startBotDaemon } from "./services/scheduler";
+import { startWebhookServer } from "./services/webhook";
+import { protectAccount, unprotectAccount } from "./db/protection.repo";
 import { getKoraTreasuryPubkey } from "./kora/payerResolver";
 import { logger } from "./utils/logger";
 
@@ -17,7 +20,10 @@ async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
   const dryRun = args.includes("--dry-run");
-  const network = args.includes("--network=devnet") ? "devnet" : "mainnet";
+  const network =
+    (args.find((a) => a.startsWith("--network="))?.split("=")[1] as
+      | "devnet"
+      | "mainnet") || "mainnet";
 
   try {
     switch (command) {
@@ -26,22 +32,37 @@ async function main() {
           koraTreasuryPubkey: getKoraTreasuryPubkey(),
           network,
         });
-        logger.info("Scan complete.");
         break;
       case "analyze":
         await analyzeAccounts({ network });
-        logger.info("Analyze complete.");
         break;
       case "report":
         generateReport();
         break;
       case "reclaim":
         await reclaimAllEligible({ dryRun, network });
-        logger.info("Reclaim process finished.");
+        break;
+      case "daemon":
+        startBotDaemon({ network, dryRun });
+        break;
+      case "server":
+        startWebhookServer(3000);
+        break;
+      case "protect":
+        if (args[1]) {
+          protectAccount(args[1], args[2] || "Manual protection");
+          logger.info(`Protected ${args[1]}`);
+        }
+        break;
+      case "unprotect":
+        if (args[1]) {
+          unprotectAccount(args[1]);
+          logger.info(`Unprotected ${args[1]}`);
+        }
         break;
       default:
         logger.info(
-          "Usage: scan | analyze | report | reclaim [--dry-run] [--network=devnet|mainnet]",
+          "Usage: scan | analyze | report | reclaim | daemon | server | protect <pubkey> | unprotect <pubkey> [--dry-run] [--network=devnet|mainnet]",
         );
     }
   } catch (err) {

@@ -25,3 +25,14 @@ CREATE TABLE IF NOT EXISTS reclaim_history (
     reclaimed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     dry_run BOOLEAN DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS protected_accounts (
+    account_pubkey TEXT PRIMARY KEY,
+    reason TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);

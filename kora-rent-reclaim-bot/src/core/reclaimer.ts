@@ -2,12 +2,24 @@
 // Solana-specific: Only reclaims via explicit close instructions or closed accounts
 // Safety: Supports dry-run, logs every action, never batches blindly
 
+import {
+  Transaction,
+  sendAndConfirmTransaction,
+  PublicKey,
+} from "@solana/web3.js";
 import { getConnection } from "../solana/connection";
-import { getTrackedAccounts } from "../db/accounts.repo";
+import { getTrackedAccounts, markAccountClosed } from "../db/accounts.repo";
 import { logReclaimAction } from "../db/reclaim.repo";
+import { isAccountProtected } from "../db/protection.repo";
 import { checkEligibility } from "./eligibility";
 import { isProgramClosable } from "../solana/programs";
+import { createReclaimInstruction } from "../solana/transactions";
+import {
+  getKoraOperatorKeypair,
+  getKoraTreasuryPubkey,
+} from "../kora/payerResolver";
 import { logger } from "../utils/logger";
+import { sendAlert } from "../services/alerts";
 import type { TrackedAccount } from "../types/account";
 
 /**
@@ -26,6 +38,10 @@ export async function reclaimAllEligible({
 
   for (const acc of accounts) {
     if (acc.is_closed) continue;
+    if (isAccountProtected(acc.account_pubkey)) {
+      logger.info(`[SKIP] Account ${acc.account_pubkey} is protected.`);
+      continue;
+    }
 
     const accountInfo = {
       isExecutable: !!acc.is_executable,
@@ -46,6 +62,7 @@ export async function reclaimAllEligible({
 
     await reclaimAccount({
       account_pubkey: acc.account_pubkey,
+      owner_program: acc.owner_program,
       reason,
       lamports: accountInfo.lamports,
       eligible,
@@ -63,6 +80,7 @@ export async function reclaimAllEligible({
 export async function reclaimAccount({
   // Edge case: Never batch blindly. Each reclaim is logged and auditable. Dry-run mode is always available.
   account_pubkey,
+  owner_program,
   reason,
   lamports,
   eligible,
@@ -70,6 +88,7 @@ export async function reclaimAccount({
   network = "mainnet",
 }: {
   account_pubkey: string;
+  owner_program: string;
   reason: string;
   lamports: number;
   eligible: boolean;
@@ -94,32 +113,48 @@ export async function reclaimAccount({
     return;
   }
 
+  const operator = getKoraOperatorKeypair();
+  const treasury = getKoraTreasuryPubkey();
+
+  if (!operator) {
+    logger.warn(
+      `[SKIP] Cannot reclaim ${account_pubkey}: Missing operator keypair for signing.`,
+    );
+    return;
+  }
+
   try {
-    // In a real implementation, you would:
-    // 1. Build a transaction to close the account or transfer lamports.
-    // 2. Sign it with the appropriate authority.
-    // 3. Send it to the network.
+    const connection = getConnection(network);
+    const isToken =
+      owner_program === "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" ||
+      owner_program === "TokenzQdBNb9WvM9mWdiUed329qS7mTM6U64mBD8uX";
 
-    // For now, we simulate success and log it.
-    const tx_signature =
-      "SIMULATED_TX_SIG_" + Math.random().toString(36).substring(7);
+    const ix = createReclaimInstruction({
+      accountPubkey: account_pubkey,
+      destinationPubkey: treasury,
+      authorityPubkey: operator.publicKey.toBase58(),
+      isToken,
+      lamports,
+    });
 
-    logger.info(
-      `[RECLAIM] Successfully reclaimed ${lamports} lamports from ${account_pubkey}. Signature: ${tx_signature}`,
+    const tx = new Transaction().add(ix);
+    const sig = await sendAndConfirmTransaction(connection, tx, [operator]);
+
+    logger.info(`[RECLAIMED] Account ${account_pubkey}, signature: ${sig}`);
+
+    await sendAlert(
+      `💰 Reclaimed ${lamports} lamports from ${account_pubkey}. Signature: ${sig}`,
     );
 
+    markAccountClosed(account_pubkey);
     logReclaimAction({
       account_pubkey,
       reclaimed_lamports: lamports,
       reason,
-      tx_signature,
+      tx_signature: sig,
       dry_run: false,
     });
-
-    // We also need to mark the account as closed in our local DB
-    const { markAccountClosed } = await import("../db/accounts.repo");
-    markAccountClosed(account_pubkey);
   } catch (err) {
-    logger.error(`Error reclaiming account ${account_pubkey}: ${err}`);
+    logger.error(`[ERROR] Failed to reclaim ${account_pubkey}: ${err}`);
   }
 }

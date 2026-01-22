@@ -4,6 +4,7 @@
 
 import { getTrackedAccounts } from "../db/accounts.repo";
 import { getReclaimHistory } from "../db/reclaim.repo";
+import { sendAlert } from "../services/alerts";
 import { logger } from "../utils/logger";
 import type { TrackedAccount } from "../types/account";
 
@@ -51,5 +52,21 @@ export function generateReport() {
   logger.info(`Total reclaimed: ${totalReclaimed} lamports`);
   logger.info(`Idle rent by age: ${JSON.stringify(idleByAge)}`);
   logger.info(`Accounts pending reclaim: ${pending}`);
+
+  if (totalLocked > 1000000000) {
+    // 1 SOL
+    sendAlert(
+      `⚠️ High amount of rent locked: ${(totalLocked / 1000000000).toFixed(4)} SOL across ${pending} accounts.`,
+    );
+  }
+
+  if (history.length > 0) {
+    logger.info("--- Recent Reclaims ---");
+    history.slice(-5).forEach((h) => {
+      logger.info(
+        `- ${h.account_pubkey}: ${h.reclaimed_lamports} lamports (${h.reason})`,
+      );
+    });
+  }
   logger.info("---------------------------");
 }
