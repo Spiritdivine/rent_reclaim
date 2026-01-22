@@ -1,0 +1,25 @@
+{
+  "name": "rent_reclaim",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "scan": "ts-node src/cli.ts scan",
+    "analyze": "ts-node src/cli.ts analyze",
+    "report": "ts-node src/cli.ts report",
+    "reclaim": "ts-node src/cli.ts reclaim"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@solana/web3.js": "^1.98.4",
+    "better-sqlite3": "^12.6.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13"
+  }
+}

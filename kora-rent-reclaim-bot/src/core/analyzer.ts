@@ -10,6 +10,8 @@ import {
   markAccountClosed,
 } from "../db/accounts.repo";
 import { logger } from "../utils/logger";
+import { PublicKey } from "@solana/web3.js";
+import type { TrackedAccount } from "../types/account";
 
 /**
  * Analyze all tracked accounts for status and activity.
@@ -21,26 +23,36 @@ export async function analyzeAccounts({
   network?: "devnet" | "mainnet";
 }) {
   const connection = getConnection(network);
-  const accounts = getTrackedAccounts();
+  const accounts = (getTrackedAccounts() as TrackedAccount[]).filter(
+    (acc) => !acc.is_closed,
+  );
   const currentSlot = await connection.getSlot("confirmed");
+
   for (const acc of accounts) {
     try {
-      const info = await connection.getAccountInfo({
-        toBase58: () => acc.account_pubkey,
-      });
+      const pubkey = new PublicKey(acc.account_pubkey);
+      const info = await connection.getAccountInfo(pubkey);
+
       if (!info) {
         markAccountClosed(acc.account_pubkey);
-        logger.info(`Account ${acc.account_pubkey} is closed.`);
+        logger.info(`Account ${acc.account_pubkey} is closed/purged.`);
         continue;
       }
+
       const isExecutable = info.executable;
       const ownerProgram = info.owner.toBase58();
       const dataSize = info.data.length;
       const lamports = info.lamports;
-      updateAccountActivity(acc.account_pubkey, currentSlot);
-      // Optionally update DB with more info if needed
+
+      updateAccountActivity(acc.account_pubkey, currentSlot, {
+        owner_program: ownerProgram,
+        is_executable: isExecutable,
+        data_size: dataSize,
+        lamports,
+      });
+
       logger.info(
-        `Account ${acc.account_pubkey}: owner=${ownerProgram}, executable=${isExecutable}, dataSize=${dataSize}, lamports=${lamports}`,
+        `Analyzed ${acc.account_pubkey}: owner=${ownerProgram}, size=${dataSize}, lamports=${lamports}`,
       );
     } catch (err) {
       logger.error(`Error analyzing account ${acc.account_pubkey}: ${err}`);

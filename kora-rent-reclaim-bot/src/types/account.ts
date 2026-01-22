@@ -12,4 +12,5 @@ export interface TrackedAccount {
   is_executable?: boolean;
   data_size?: number;
   lamports?: number;
+  created_at?: string;
 }

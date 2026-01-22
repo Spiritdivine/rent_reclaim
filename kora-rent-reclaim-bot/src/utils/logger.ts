@@ -3,7 +3,10 @@
 // Safety: All logs are explicit, no silent actions
 
 export const logger = {
-  info: (msg: string) => console.log(`[INFO] ${msg}`),
-  warn: (msg: string) => console.warn(`[WARN] ${msg}`),
-  error: (msg: string) => console.error(`[ERROR] ${msg}`),
+  info: (msg: string) =>
+    console.log(`[${new Date().toISOString()}] [INFO] ${msg}`),
+  warn: (msg: string) =>
+    console.warn(`[${new Date().toISOString()}] [WARN] ${msg}`),
+  error: (msg: string) =>
+    console.error(`[${new Date().toISOString()}] [ERROR] ${msg}`),
 };

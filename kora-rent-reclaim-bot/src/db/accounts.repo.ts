@@ -11,7 +11,7 @@ export function addSponsoredAccount(account: {
   creation_slot: number;
 }) {
   const stmt = db.prepare(
-    `INSERT INTO sponsored_accounts (account_pubkey, owner_program, funded_lamports, creation_slot) VALUES (?, ?, ?, ?)`,
+    `INSERT OR IGNORE INTO sponsored_accounts (account_pubkey, owner_program, funded_lamports, creation_slot) VALUES (?, ?, ?, ?)`,
   );
   stmt.run(
     account.account_pubkey,
@@ -24,11 +24,30 @@ export function addSponsoredAccount(account: {
 export function updateAccountActivity(
   account_pubkey: string,
   last_activity_slot: number,
+  details: {
+    owner_program: string;
+    is_executable: boolean;
+    data_size: number;
+    lamports: number;
+  },
 ) {
   const stmt = db.prepare(
-    `UPDATE sponsored_accounts SET last_activity_slot = ? WHERE account_pubkey = ?`,
+    `UPDATE sponsored_accounts 
+     SET last_activity_slot = ?, 
+         owner_program = ?, 
+         is_executable = ?, 
+         data_size = ?, 
+         lamports = ? 
+     WHERE account_pubkey = ?`,
   );
-  stmt.run(last_activity_slot, account_pubkey);
+  stmt.run(
+    last_activity_slot,
+    details.owner_program,
+    details.is_executable ? 1 : 0,
+    details.data_size,
+    details.lamports,
+    account_pubkey,
+  );
 }
 
 export function markAccountClosed(account_pubkey: string) {
