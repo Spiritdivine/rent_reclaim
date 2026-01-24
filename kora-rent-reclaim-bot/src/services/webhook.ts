@@ -12,7 +12,7 @@ app.use(bodyParser.json());
 
 const TELEGRAM_TOKEN =
   process.env.TELEGRAM_BOT_TOKEN ||
-  "8094812401:AAGFKOlcEb3zKXXXIKK9o6MxSD61rYhL_Qk";
+  "<TELEGRAM BOT TOKEN/>";
 
 /**
  * Handles incoming Telegram webhooks.
